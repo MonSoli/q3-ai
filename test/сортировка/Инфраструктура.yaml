@@ -1,0 +1,45 @@
+# Инфраструктура ООО «АльфаТех»
+# Обновлено: 2026-03-01
+
+production:
+  servers:
+    web:
+      count: 2
+      os: Ubuntu 22.04 LTS
+      cpu: 4 vCPU
+      ram: 16 GB
+      disk: 200 GB SSD
+      services:
+        - nginx
+        - gunicorn
+        - django
+
+    database:
+      count: 1
+      os: Ubuntu 22.04 LTS
+      cpu: 8 vCPU
+      ram: 32 GB
+      disk: 500 GB SSD
+      services:
+        - postgresql-15
+        - redis-7
+
+    storage:
+      type: S3-совместимое хранилище
+      provider: Yandex Cloud
+      bucket: alfatech-prod-docs
+      size_limit: 1 TB
+
+  monitoring:
+    tool: Grafana + Prometheus
+    alerts:
+      - channel: telegram
+        events: [cpu_high, disk_full, service_down]
+      - channel: email
+        events: [security_breach, backup_failed]
+
+  backup:
+    schedule: ежедневно в 03:00
+    retention: 30 дней
+    storage: отдельный S3 бакет
+    tested: 2026-02-15

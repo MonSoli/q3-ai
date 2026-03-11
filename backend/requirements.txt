@@ -1,0 +1,14 @@
+fastapi
+uvicorn[standard]
+httpx
+aiosqlite
+python-jose[cryptography]
+bcrypt
+python-multipart
+pypdf
+python-docx
+python-dotenv
+slowapi
+numpy
+Pillow
+pytesseract

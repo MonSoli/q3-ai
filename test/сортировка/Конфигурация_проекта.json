@@ -1,0 +1,35 @@
+{
+  "project": "Цифровой документооборот",
+  "version": "2.1.0",
+  "company": "ООО «АльфаТех»",
+  "environment": "production",
+  "database": {
+    "host": "db.alfatech.local",
+    "port": 5432,
+    "name": "docflow_prod",
+    "max_connections": 50
+  },
+  "storage": {
+    "type": "s3",
+    "bucket": "alfatech-documents",
+    "max_file_size_mb": 100,
+    "allowed_formats": [
+      "pdf",
+      "docx",
+      "xlsx",
+      "jpg",
+      "png"
+    ]
+  },
+  "notifications": {
+    "email_enabled": true,
+    "telegram_enabled": true,
+    "webhook_url": "https://hooks.alfatech.local/notify"
+  },
+  "security": {
+    "session_timeout_minutes": 30,
+    "max_login_attempts": 5,
+    "two_factor_auth": true,
+    "password_min_length": 12
+  }
+}

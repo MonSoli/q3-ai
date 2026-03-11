@@ -1,0 +1,57 @@
+{
+  "company": "ООО «АльфаТех»",
+  "period": "2025",
+  "currency": "RUB",
+  "revenue": {
+    "Q1": 10550000,
+    "Q2": 11200000,
+    "Q3": 11800000,
+    "Q4": 12450000,
+    "total": 45900000
+  },
+  "expenses": {
+    "salary": 25200000,
+    "rent": 2160000,
+    "cloud_infrastructure": 900000,
+    "equipment": 1500000,
+    "marketing": 800000,
+    "other": 2340000,
+    "total": 32900000
+  },
+  "profit": {
+    "gross": 45900000,
+    "net": 13000000,
+    "margin_percent": 28.3
+  },
+  "employees": {
+    "start_of_year": 35,
+    "end_of_year": 42,
+    "avg_salary": 135000,
+    "turnover_percent": 8.5
+  },
+  "clients": {
+    "total": 28,
+    "new_this_year": 12,
+    "churned": 3,
+    "top_clients": [
+      {
+        "name": "ООО «ГаммаЛогистик»",
+        "revenue": 8500000
+      },
+      {
+        "name": "АО «СтройИнвест»",
+        "revenue": 5200000
+      },
+      {
+        "name": "ООО «МедиаГрупп»",
+        "revenue": 3800000
+      }
+    ]
+  },
+  "kpi": {
+    "customer_satisfaction": 4.2,
+    "nps": 45,
+    "avg_project_duration_days": 67,
+    "on_time_delivery_percent": 82
+  }
+}

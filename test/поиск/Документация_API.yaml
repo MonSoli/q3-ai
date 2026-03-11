@@ -1,0 +1,73 @@
+# API документация: Цифровой документооборот
+# Версия API: 2.1.0
+# Базовый URL: https://api.alfatech.ru/v2
+
+auth:
+  login:
+    method: POST
+    path: /auth/login
+    description: Авторизация пользователя
+    body:
+      email: string (required)
+      password: string (required)
+    response:
+      access_token: string
+      refresh_token: string
+      expires_in: 3600
+
+  refresh:
+    method: POST
+    path: /auth/refresh
+    description: Обновление токена
+    body:
+      refresh_token: string (required)
+
+documents:
+  list:
+    method: GET
+    path: /documents
+    description: Получить список документов
+    params:
+      page: integer (default 1)
+      per_page: integer (default 20, max 100)
+      status: string (draft|review|approved|archived)
+      doc_type: string
+      author_id: integer
+      search: string (полнотекстовый поиск)
+    response: массив объектов Document
+
+  create:
+    method: POST
+    path: /documents
+    description: Создать документ
+    body:
+      title: string (required, max 500)
+      doc_type: string (required)
+      content: string
+      department_id: integer
+    response: объект Document (201 Created)
+
+  upload:
+    method: POST
+    path: /documents/{id}/files
+    description: Загрузить файл к документу
+    content_type: multipart/form-data
+    limits:
+      max_file_size: 100 MB
+      allowed_types: [pdf, docx, xlsx, jpg, png]
+
+departments:
+  list:
+    method: GET
+    path: /departments
+    description: Список отделов
+
+  employees:
+    method: GET
+    path: /departments/{id}/employees
+    description: Сотрудники отдела
+
+rate_limits:
+  anonymous: 60 запросов/минуту
+  authenticated: 300 запросов/минуту
+  file_upload: 10 запросов/минуту

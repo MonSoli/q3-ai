@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<catalog company="ООО «АльфаТех»" date="2026-03-01">
+  <category name="Серверное оборудование">
+    <product id="SRV-001">
+      <name>Сервер PowerEdge R750</name>
+      <price currency="RUB">485000</price>
+      <quantity>3</quantity>
+      <supplier>ООО «ТехноСнаб»</supplier>
+    </product>
+    <product id="SRV-002">
+      <name>СХД NetApp FAS2750</name>
+      <price currency="RUB">1250000</price>
+      <quantity>1</quantity>
+      <supplier>АО «СерверПро»</supplier>
+    </product>
+  </category>
+  <category name="Сетевое оборудование">
+    <product id="NET-001">
+      <name>Коммутатор Cisco Catalyst 9300</name>
+      <price currency="RUB">178000</price>
+      <quantity>5</quantity>
+      <supplier>ООО «НетКом»</supplier>
+    </product>
+    <product id="NET-002">
+      <name>Маршрутизатор MikroTik CCR2004</name>
+      <price currency="RUB">45000</price>
+      <quantity>2</quantity>
+      <supplier>ИП Сетевые решения</supplier>
+    </product>
+  </category>
+  <category name="Рабочие станции">
+    <product id="WS-001">
+      <name>Ноутбук Lenovo ThinkPad T14s</name>
+      <price currency="RUB">125000</price>
+      <quantity>10</quantity>
+      <supplier>ООО «ТехноСнаб»</supplier>
+    </product>
+  </category>
+</catalog>

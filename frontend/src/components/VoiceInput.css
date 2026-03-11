@@ -1,0 +1,102 @@
+.voice-input-container {
+  display: flex;
+  align-items: center;
+  position: relative;
+}
+
+.voice-btn {
+  background: none;
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  min-width: 38px;
+  min-height: 38px;
+}
+
+.voice-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.voice-btn.listening {
+  background: #ef4444;
+  border-color: #ef4444;
+  color: white;
+  animation: voice-pulse 1.5s ease infinite;
+}
+
+.voice-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.voice-waves {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 18px;
+}
+
+.voice-waves span {
+  display: block;
+  width: 3px;
+  background: white;
+  border-radius: 2px;
+  animation: voice-wave 0.8s ease infinite;
+}
+
+.voice-waves span:nth-child(1) { height: 6px; animation-delay: 0.0s; }
+.voice-waves span:nth-child(2) { height: 12px; animation-delay: 0.1s; }
+.voice-waves span:nth-child(3) { height: 16px; animation-delay: 0.2s; }
+.voice-waves span:nth-child(4) { height: 12px; animation-delay: 0.3s; }
+.voice-waves span:nth-child(5) { height: 6px; animation-delay: 0.4s; }
+
+@keyframes voice-wave {
+  0%, 100% { transform: scaleY(0.5); }
+  50% { transform: scaleY(1); }
+}
+
+@keyframes voice-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+  50% { box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
+}
+
+.voice-interim {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  right: 0;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 8px 14px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+.voice-interim-dot {
+  width: 8px;
+  height: 8px;
+  background: #ef4444;
+  border-radius: 50%;
+  flex-shrink: 0;
+  animation: voice-pulse-dot 1s ease infinite;
+}
+
+@keyframes voice-pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
