@@ -12,3 +12,4 @@ slowapi
 numpy
 Pillow
 pytesseract
+cryptography

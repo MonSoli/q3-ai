@@ -279,7 +279,14 @@ async def analyze_document(doc_id: str, model: str = "qwen3:4b") -> dict:
         if not doc:
             return {"error": "Document not found"}
 
-    content = doc["content"] or ""
+        # Data Shield: деанонимизация для анализа (извлечение entities из полного текста)
+        content = doc["content"] or ""
+        try:
+            from data_shield import deanonymize_document
+            content = await deanonymize_document(db, doc_id, content)
+        except Exception as e:
+            logger.warning("Deanonymization failed for analysis: %s", e)
+
     filename = doc["filename"]
 
     classification = classify_document_fast(content, filename)

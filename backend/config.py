@@ -10,6 +10,7 @@ except ImportError:
     pass
 
 SECRET_KEY_FILE = os.path.join(_dir, ".secret_key")
+DATA_SHIELD_KEY_FILE = os.path.join(_dir, ".data_shield_key")
 
 
 def _get_secret_key():
@@ -25,7 +26,23 @@ def _get_secret_key():
     return key
 
 
+def _get_data_shield_key():
+    """Получить или сгенерировать ключ шифрования для обезличивания данных (Fernet)."""
+    env_key = os.environ.get("DATA_SHIELD_KEY")
+    if env_key:
+        return env_key
+    if os.path.exists(DATA_SHIELD_KEY_FILE):
+        with open(DATA_SHIELD_KEY_FILE, "r") as f:
+            return f.read().strip()
+    from cryptography.fernet import Fernet
+    key = Fernet.generate_key().decode("ascii")
+    with open(DATA_SHIELD_KEY_FILE, "w") as f:
+        f.write(key)
+    return key
+
+
 SECRET_KEY = _get_secret_key()
+DATA_SHIELD_KEY = _get_data_shield_key()
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.environ.get("ACCESS_TOKEN_EXPIRE_MINUTES", 60 * 24))
 REFRESH_TOKEN_EXPIRE_DAYS = int(os.environ.get("REFRESH_TOKEN_EXPIRE_DAYS", 30))

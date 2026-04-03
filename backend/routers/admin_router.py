@@ -158,3 +158,58 @@ async def get_audit_log(limit: int = 100, offset: int = 0, admin=Depends(get_adm
     )
     rows = await cursor.fetchall()
     return {"entries": [dict(r) for r in rows]}
+
+
+@router.get("/data-shield/stats")
+async def data_shield_stats(admin=Depends(get_admin_user), db=Depends(get_db)):
+    """Статистика системы обезличивания данных (Data Shield)."""
+    from data_shield import get_shield_stats
+    stats = await get_shield_stats(db)
+    return stats
+
+
+@router.post("/data-shield/reprocess")
+async def data_shield_reprocess(admin=Depends(get_admin_user), db=Depends(get_db)):
+    """Переобезличить все документы (для миграции существующих данных)."""
+    from data_shield import anonymize_text, store_vault_entries, load_vault_entries
+
+    cursor = await db.execute(
+        "SELECT id, filename, content FROM knowledge_documents WHERE content IS NOT NULL AND content != ''"
+    )
+    docs = await cursor.fetchall()
+
+    processed = 0
+    shielded = 0
+    total_values = 0
+
+    for doc in docs:
+        doc_id = doc["id"]
+        content = doc["content"]
+
+        # Пропускаем уже обезличенные документы (содержат плейсхолдеры)
+        existing = await load_vault_entries(db, doc_id)
+        if existing:
+            continue
+
+        anonymized, vault_entries = anonymize_text(content)
+        if vault_entries:
+            await db.execute(
+                "UPDATE knowledge_documents SET content = ?, updated_at = datetime('now') WHERE id = ?",
+                (anonymized, doc_id),
+            )
+            await store_vault_entries(db, doc_id, vault_entries)
+            shielded += 1
+            total_values += len(vault_entries)
+        processed += 1
+
+    await db.commit()
+
+    await _audit_log(db, admin, "data_shield_reprocess", details=f"processed={processed}, shielded={shielded}, values={total_values}")
+    await db.commit()
+
+    return {
+        "processed": processed,
+        "shielded": shielded,
+        "total_values": total_values,
+        "message": f"Обработано {processed} документов, обезличено {shielded} с {total_values} значениями"
+    }

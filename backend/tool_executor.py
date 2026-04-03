@@ -205,6 +205,10 @@ async def _create_document(args: dict, user_id: str, db) -> str:
     if folder_id == "NOT_FOUND":
         return json.dumps({"error": f"Путь '{folder_path}' не найден"})
 
+    # Data Shield: обезличивание
+    from data_shield import anonymize_text, store_vault_entries
+    anonymized_content, vault_entries = anonymize_text(content)
+
     doc_id = str(uuid.uuid4())
     ext = "." + filename.split(".")[-1].lower() if "." in filename else ".txt"
     now = _now_iso()
@@ -213,8 +217,12 @@ async def _create_document(args: dict, user_id: str, db) -> str:
         """INSERT INTO knowledge_documents
            (id, filename, file_type, file_size, content, folder_id, uploaded_by_id, uploaded_by, created_at, updated_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-        (doc_id, filename, ext, len(content.encode("utf-8")), content, folder_id, user_id, "AI", now, now)
+        (doc_id, filename, ext, len(content.encode("utf-8")), anonymized_content, folder_id, user_id, "AI", now, now)
     )
+
+    if vault_entries:
+        await store_vault_entries(db, doc_id, vault_entries)
+
     await db.commit()
 
     full_path = f"{folder_path.rstrip('/')}/{filename}"
@@ -248,9 +256,16 @@ async def _edit_document(args: dict, db) -> str:
     if not row:
         return json.dumps({"error": f"Документ '{filename}' не найден"})
 
+    # Data Shield: обезличивание нового контента
+    from data_shield import anonymize_text, store_vault_entries
+    anonymized_content, vault_entries = anonymize_text(new_content)
+
+    if vault_entries:
+        await store_vault_entries(db, row["id"], vault_entries)
+
     await db.execute(
         "UPDATE knowledge_documents SET content = ?, file_size = ?, updated_at = ? WHERE id = ?",
-        (new_content, len(new_content.encode("utf-8")), _now_iso(), row["id"])
+        (anonymized_content, len(new_content.encode("utf-8")), _now_iso(), row["id"])
     )
     await db.commit()
 
@@ -312,17 +327,17 @@ async def _read_document(args: dict, db) -> str:
             return json.dumps({"error": f"Путь '{folder_path}' не найден"})
         if folder_id is None:
             cursor = await db.execute(
-                "SELECT filename, content, file_type, file_size, folder_id FROM knowledge_documents WHERE filename = ? AND folder_id IS NULL",
+                "SELECT id, filename, content, file_type, file_size, folder_id FROM knowledge_documents WHERE filename = ? AND folder_id IS NULL",
                 (filename,)
             )
         else:
             cursor = await db.execute(
-                "SELECT filename, content, file_type, file_size, folder_id FROM knowledge_documents WHERE filename = ? AND folder_id = ?",
+                "SELECT id, filename, content, file_type, file_size, folder_id FROM knowledge_documents WHERE filename = ? AND folder_id = ?",
                 (filename, folder_id)
             )
     else:
         cursor = await db.execute(
-            "SELECT filename, content, file_type, file_size, folder_id FROM knowledge_documents WHERE filename = ?",
+            "SELECT id, filename, content, file_type, file_size, folder_id FROM knowledge_documents WHERE filename = ?",
             (filename,)
         )
 
@@ -334,6 +349,11 @@ async def _read_document(args: dict, db) -> str:
     full_path = f"{doc_path.rstrip('/')}/{row['filename']}"
 
     content = row["content"] or ""
+
+    # Data Shield: деанонимизация для авторизованного пользователя
+    from data_shield import deanonymize_document
+    content = await deanonymize_document(db, row["id"], content)
+
     max_len = 120000
     truncated = len(content) > max_len
     if truncated:
@@ -366,16 +386,22 @@ async def _search_documents(args: dict, db) -> str:
     )
     rows = await cursor.fetchall()
 
+    # Data Shield: деанонимизация превью для авторизованного пользователя
+    from data_shield import deanonymize_document
+
     results = []
     for row in rows:
         doc_path = await get_folder_path(db, row["folder_id"])
         full_path = f"{doc_path.rstrip('/')}/{row['filename']}"
+        preview = row["preview"] or ""
+        if preview:
+            preview = await deanonymize_document(db, row["id"], preview)
         results.append({
             "filename": row["filename"],
             "path": full_path,
             "file_type": row["file_type"],
             "file_size": row["file_size"],
-            "preview": row["preview"] or "",
+            "preview": preview,
         })
 
     return json.dumps({"query": query, "count": len(results), "results": results})
@@ -589,16 +615,24 @@ async def _semantic_search(args: dict) -> str:
 
     try:
         from rag_engine import hybrid_search
+        from data_shield import deanonymize_document
+        import aiosqlite
+        from config import DB_PATH
+
         results = await hybrid_search(query, top_k=top_k)
 
         formatted = []
-        for r in results:
-            formatted.append({
-                "filename": r["filename"],
-                "score": r["score"],
-                "match_type": r.get("match_type", "unknown"),
-                "preview": r["content"][:300],
-            })
+        async with aiosqlite.connect(DB_PATH) as db:
+            db.row_factory = aiosqlite.Row
+            for r in results:
+                # Data Shield: деанонимизация превью
+                content = await deanonymize_document(db, r["document_id"], r["content"])
+                formatted.append({
+                    "filename": r["filename"],
+                    "score": r["score"],
+                    "match_type": r.get("match_type", "unknown"),
+                    "preview": content[:300],
+                })
 
         return json.dumps({
             "query": query,

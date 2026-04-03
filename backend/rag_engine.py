@@ -255,12 +255,21 @@ async def get_rag_context(query: str, max_tokens: int = 4000) -> str:
     if not results:
         return ""
 
+    # Data Shield: деанонимизация чанков для RAG-контекста
+    from data_shield import deanonymize_document
+
     context_parts = []
     total_chars = 0
     char_limit = max_tokens * 3
 
     for r in results:
-        chunk_text_str = f"[{r['filename']}] {r['content']}"
+        content = r["content"]
+        # Деанонимизируем содержимое чанка
+        async with aiosqlite.connect(DB_PATH) as db:
+            db.row_factory = aiosqlite.Row
+            content = await deanonymize_document(db, r["document_id"], content)
+
+        chunk_text_str = f"[{r['filename']}] {content}"
         if total_chars + len(chunk_text_str) > char_limit:
             break
         context_parts.append(chunk_text_str)

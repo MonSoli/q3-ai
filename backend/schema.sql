@@ -204,3 +204,17 @@ CREATE TABLE IF NOT EXISTS notifications (
 
 CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id);
 CREATE INDEX IF NOT EXISTS idx_notifications_read ON notifications(is_read);
+
+CREATE TABLE IF NOT EXISTS sensitive_data_vault (
+    id                  TEXT PRIMARY KEY,
+    document_id         TEXT NOT NULL,
+    placeholder         TEXT NOT NULL,
+    category            TEXT NOT NULL,
+    encrypted_value     TEXT NOT NULL,
+    original_position   INTEGER NOT NULL DEFAULT 0,
+    created_at          TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (document_id) REFERENCES knowledge_documents(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_vault_document ON sensitive_data_vault(document_id);
+CREATE INDEX IF NOT EXISTS idx_vault_category ON sensitive_data_vault(category);

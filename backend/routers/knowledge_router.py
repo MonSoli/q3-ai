@@ -11,6 +11,7 @@ from auth import get_current_user
 from database import get_db
 from models import CreateFolderRequest, RenameFolderRequest, MoveDocumentRequest
 from config import MAX_UPLOAD_SIZE
+from data_shield import anonymize_text, store_vault_entries, deanonymize_document, load_vault_entries
 
 logger = logging.getLogger(__name__)
 
@@ -250,6 +251,13 @@ async def upload_document(
     except Exception:
         pass
 
+    # --- Data Shield: обезличивание ---
+    original_content = content
+    anonymized_content, vault_entries = anonymize_text(content)
+    shielded = len(vault_entries) > 0
+    if shielded:
+        logger.info("Data Shield: document '%s' — %d sensitive values anonymized", file.filename, len(vault_entries))
+
     doc_id = str(uuid.uuid4())
     uploaded_by_name = f"{user.get('last_name', '')} {user.get('first_name', '')}".strip() or user.get('email', '')
 
@@ -260,19 +268,24 @@ async def upload_document(
             doc_type, doc_type_label, created_at, updated_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (
-            doc_id, file.filename, ext, file_size, content,
+            doc_id, file.filename, ext, file_size, anonymized_content,
             folder_id, user["id"], uploaded_by_name,
             doc_type, doc_type_label,
             now, now,
         )
     )
+
+    # Сохраняем зашифрованные значения в vault
+    if vault_entries:
+        await store_vault_entries(db, doc_id, vault_entries)
+
     await db.commit()
 
     if content and not content.startswith("["):
         async def _auto_index():
             try:
                 from rag_engine import index_document
-                await index_document(doc_id, file.filename, content, folder_id)
+                await index_document(doc_id, file.filename, anonymized_content, folder_id)
                 logger.info("Auto-indexed document: %s", file.filename)
             except Exception as e:
                 logger.warning("Auto-index failed for %s: %s", file.filename, e)
@@ -286,7 +299,9 @@ async def upload_document(
         "folder_id": folder_id,
         "doc_type": doc_type,
         "doc_type_label": doc_type_label,
-        "message": "Документ успешно загружен"
+        "data_shielded": shielded,
+        "shielded_count": len(vault_entries),
+        "message": "Документ успешно загружен" + (f" (обезличено: {len(vault_entries)} значений)" if shielded else "")
     }
 
 
@@ -300,7 +315,11 @@ async def get_document(doc_id: str, user=Depends(get_current_user), db=Depends(g
     row = await cursor.fetchone()
     if not row:
         raise HTTPException(status_code=404, detail="Документ не найден")
-    return dict(row)
+    result = dict(row)
+    # Data Shield: деанонимизация для авторизованного пользователя
+    if result.get("content"):
+        result["content"] = await deanonymize_document(db, doc_id, result["content"])
+    return result
 
 
 @router.put("/documents/{doc_id}")
@@ -314,10 +333,15 @@ async def update_document(
     if not await cursor.fetchone():
         raise HTTPException(status_code=404, detail="Документ не найден")
 
-    new_size = len(data.content.encode("utf-8"))
+    # Data Shield: обезличиваем новый контент
+    anonymized_content, vault_entries = anonymize_text(data.content)
+    if vault_entries:
+        await store_vault_entries(db, doc_id, vault_entries)
+
+    new_size = len(anonymized_content.encode("utf-8"))
     await db.execute(
         "UPDATE knowledge_documents SET content = ?, file_size = ?, updated_at = ? WHERE id = ?",
-        (data.content, new_size, datetime.now(timezone.utc).isoformat(), doc_id)
+        (anonymized_content, new_size, datetime.now(timezone.utc).isoformat(), doc_id)
     )
     await db.commit()
     return {"message": "Документ обновлён"}
@@ -359,6 +383,12 @@ async def copy_document(doc_id: str, user=Depends(get_current_user), db=Depends(
             datetime.now(timezone.utc).isoformat(), datetime.now(timezone.utc).isoformat(),
         )
     )
+
+    # Data Shield: копируем vault-записи для нового документа
+    vault_entries = await load_vault_entries(db, doc_id)
+    if vault_entries:
+        await store_vault_entries(db, new_id, vault_entries)
+
     await db.commit()
     return {"id": new_id, "filename": new_filename, "message": "Копия создана"}
 
@@ -401,7 +431,7 @@ async def get_knowledge_context(user=Depends(get_current_user), db=Depends(get_d
         return "/" + "/".join(parts) if parts else "/"
 
     cursor = await db.execute(
-        "SELECT filename, content, folder_id FROM knowledge_documents ORDER BY created_at"
+        "SELECT id, filename, content, folder_id FROM knowledge_documents ORDER BY created_at"
     )
     rows = await cursor.fetchall()
 
@@ -412,9 +442,11 @@ async def get_knowledge_context(user=Depends(get_current_user), db=Depends(get_d
     for row in rows:
         doc = dict(row)
         if doc["content"]:
+            # Data Shield: деанонимизация для авторизованного пользователя
+            content = await deanonymize_document(db, doc["id"], doc["content"])
             path = get_path(doc["folder_id"])
             full_path = f"{path}/{doc['filename']}" if path != "/" else f"/{doc['filename']}"
-            context_parts.append(f"[{full_path}]\n{doc['content']}\n")
+            context_parts.append(f"[{full_path}]\n{content}\n")
 
     return {"context": "\n".join(context_parts)}
 
@@ -526,6 +558,9 @@ async def sort_and_upload(
         else:
             folder_id = category_folders[doc_type_label]
 
+        # Data Shield: обезличивание
+        anonymized_content, vault_entries = anonymize_text(content)
+
         doc_id = str(uuid.uuid4())
         await db.execute(
             """INSERT INTO knowledge_documents
@@ -533,12 +568,15 @@ async def sort_and_upload(
                 doc_type, doc_type_label, created_at, updated_at)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
-                doc_id, filename, ext, file_size, content,
+                doc_id, filename, ext, file_size, anonymized_content,
                 folder_id, user["id"], uploaded_by_name,
                 doc_type, doc_type_label,
                 now_str, now_str,
             )
         )
+
+        if vault_entries:
+            await store_vault_entries(db, doc_id, vault_entries)
 
         results.append({
             "doc_id": doc_id,
@@ -546,10 +584,11 @@ async def sort_and_upload(
             "category": doc_type_label,
             "doc_type": doc_type,
             "confidence": classification.get("confidence", 0),
+            "shielded_count": len(vault_entries),
         })
 
         if content and not content.startswith("["):
-            async def _auto_index(did=doc_id, fn=filename, cnt=content, fid=folder_id):
+            async def _auto_index(did=doc_id, fn=filename, cnt=anonymized_content, fid=folder_id):
                 try:
                     from rag_engine import index_document
                     await index_document(did, fn, cnt, fid)
